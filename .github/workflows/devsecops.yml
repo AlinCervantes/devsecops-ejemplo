@@ -1,0 +1,64 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up the environment (e.g., Python)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      # Step 3: Install dependencies for security tools
+      - name: Install dependencies for security tools
+        run: |
+          pip install bandit
+
+      # Step 4: Static Application Security Testing (SAST) with Bandit
+      - name: SAST with Bandit
+        run: bandit -r . || true
+        # `|| true` allows the pipeline to continue even if Bandit finds issues.
+        # In a real environment, you might omit this to fail the pipeline on vulnerabilities.
+
+      # Step 5: Software Composition Analysis (SCA) with Snyk
+      - name: Dependency Scan with Snyk
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+        # `continue-on-error: true` allows the pipeline to continue if Snyk encounters an error.
+        # In production, you would typically require this step to pass.
+
+      # Step 6: Build the Docker image
+      - name: Build Docker image
+        run: docker build -t my-app:latest .
+
+      # Step 7: Scan the Docker image for vulnerabilities with Trivy
+      - name: Scan Docker image for vulnerabilities with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'my-app:latest'
+          severity: 'CRITICAL'
+          exit-code: '1'
+        # `exit-code: '1'` will cause this step to fail and stop the pipeline if critical vulnerabilities are found.
+
+  deploy:
+    needs: build-and-scan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to production
+      run: echo "Deploying to production..."
+      - name: Deploy to production
+        run: echo "Deploying to production..."
